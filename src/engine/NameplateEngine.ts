@@ -1,0 +1,198 @@
+import * as THREE from 'three';
+import { SceneManager } from './SceneManager';
+import { STLImporter } from './STLImporter';
+import { TextMeshBuilder } from './TextMeshBuilder';
+import { LogoMeshBuilder } from './LogoMeshBuilder';
+import { CSGProcessor } from './CSGProcessor';
+import { STLExporterService } from './STLExporterService';
+import { downloadBlob, readFileAsArrayBuffer, readFileAsText } from '../utils/fileHelpers';
+import type { NameplateState, EngineCallbacks, BoundingBoxInfo } from './types';
+import { DEFAULT_STATE } from './types';
+
+export class NameplateEngine {
+  private sceneManager: SceneManager;
+  private stlImporter = new STLImporter();
+  private textMeshBuilder = new TextMeshBuilder();
+  private logoMeshBuilder = new LogoMeshBuilder();
+  private csgProcessor = new CSGProcessor();
+  private stlExporter = new STLExporterService();
+
+  private state: NameplateState = { ...DEFAULT_STATE };
+  private callbacks: EngineCallbacks;
+
+  // Scene objects
+  private baseMesh: THREE.Mesh | null = null;
+  private baseGeometry: THREE.BufferGeometry | null = null;
+  private baseBBox: BoundingBoxInfo | null = null;
+  private textGroup: THREE.Group | null = null;
+  private logoGroup: THREE.Group | null = null;
+  private svgText: string | null = null;
+
+  constructor(canvas: HTMLCanvasElement, callbacks: EngineCallbacks) {
+    this.sceneManager = new SceneManager(canvas);
+    this.callbacks = callbacks;
+    this.textMeshBuilder.loadFont().catch((err) => {
+      this.updateState({ error: `Failed to load font: ${err.message}` });
+    });
+  }
+
+  private updateState(partial: Partial<NameplateState>): void {
+    Object.assign(this.state, partial);
+    this.callbacks.onStateChange(partial);
+  }
+
+  getState(): NameplateState {
+    return { ...this.state };
+  }
+
+  async loadBaseSTL(file: File): Promise<void> {
+    try {
+      this.updateState({ statusMessage: 'Loading STL...', error: null });
+      const buffer = await readFileAsArrayBuffer(file);
+      const geometry = this.stlImporter.loadFromArrayBuffer(buffer);
+
+      // Remove old base mesh
+      if (this.baseMesh) {
+        this.sceneManager.scene.remove(this.baseMesh);
+        this.baseMesh.geometry.dispose();
+        (this.baseMesh.material as THREE.Material).dispose();
+      }
+
+      this.baseGeometry = geometry;
+      this.baseBBox = STLImporter.getBoundingBoxInfo(geometry);
+
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xcccccc,
+        roughness: 0.5,
+        metalness: 0.2,
+      });
+      this.baseMesh = new THREE.Mesh(geometry, material);
+      this.sceneManager.scene.add(this.baseMesh);
+      this.sceneManager.fitCameraToObject(this.baseMesh);
+
+      this.updateState({
+        isBaseLoaded: true,
+        statusMessage: 'STL loaded. Enter text or upload a logo.',
+      });
+
+      // Refresh overlays
+      this.updateTextPreview();
+      this.updateLogoPreview();
+    } catch (err) {
+      this.updateState({
+        error: `Failed to load STL: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        statusMessage: 'Error loading STL.',
+      });
+    }
+  }
+
+  setTextLine(index: 0 | 1 | 2, text: string): void {
+    const lines = [...this.state.textLines] as [string, string, string];
+    lines[index] = text;
+    this.updateState({ textLines: lines });
+    this.updateTextPreview();
+  }
+
+  setEmbossDepth(depth: number): void {
+    this.updateState({ embossDepth: depth });
+    this.updateTextPreview();
+    this.updateLogoPreview();
+  }
+
+  setFontSize(size: number): void {
+    this.updateState({ fontSize: size });
+    this.updateTextPreview();
+  }
+
+  async loadLogo(file: File): Promise<void> {
+    try {
+      this.svgText = await readFileAsText(file);
+      this.updateState({ logoFile: file, error: null });
+      this.updateLogoPreview();
+    } catch (err) {
+      this.updateState({
+        error: `Failed to load SVG: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      });
+    }
+  }
+
+  private updateTextPreview(): void {
+    if (this.textGroup) {
+      this.sceneManager.scene.remove(this.textGroup);
+    }
+    if (!this.baseBBox) return;
+
+    this.textGroup = this.textMeshBuilder.createMultiLineTextMeshes(
+      this.state.textLines,
+      this.state.fontSize,
+      this.state.embossDepth,
+      this.baseBBox,
+    );
+    this.sceneManager.scene.add(this.textGroup);
+  }
+
+  private updateLogoPreview(): void {
+    if (this.logoGroup) {
+      this.sceneManager.scene.remove(this.logoGroup);
+    }
+    if (!this.baseBBox || !this.svgText) return;
+
+    try {
+      this.logoGroup = this.logoMeshBuilder.createLogoMesh(
+        this.svgText,
+        this.state.embossDepth,
+        this.baseBBox,
+      );
+      this.sceneManager.scene.add(this.logoGroup);
+    } catch (err) {
+      this.updateState({
+        error: `Logo error: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      });
+    }
+  }
+
+  async generateFinalMesh(): Promise<void> {
+    if (!this.baseGeometry || !this.baseBBox) {
+      throw new Error('No base STL loaded.');
+    }
+
+    this.updateState({ isProcessing: true, statusMessage: 'Generating mesh...', error: null });
+
+    try {
+      // Collect all emboss geometries in world space
+      const embossGeometries: THREE.BufferGeometry[] = [];
+
+      // Text geometries
+      if (this.textGroup) {
+        embossGeometries.push(...CSGProcessor.flattenGroup(this.textGroup));
+      }
+
+      // Logo geometries
+      if (this.logoGroup) {
+        embossGeometries.push(...CSGProcessor.flattenGroup(this.logoGroup));
+      }
+
+      // Run CSG union
+      const finalGeometry = this.csgProcessor.union(this.baseGeometry, embossGeometries);
+
+      // Export
+      const blob = this.stlExporter.exportToBlob(finalGeometry);
+      downloadBlob(blob, 'nameplate.stl');
+
+      this.updateState({
+        isProcessing: false,
+        statusMessage: 'Download started!',
+      });
+    } catch (err) {
+      this.updateState({
+        isProcessing: false,
+        error: `Generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        statusMessage: 'Error during generation.',
+      });
+    }
+  }
+
+  dispose(): void {
+    this.sceneManager.dispose();
+  }
+}
