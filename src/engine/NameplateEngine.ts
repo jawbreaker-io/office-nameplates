@@ -6,7 +6,7 @@ import { LogoMeshBuilder } from './LogoMeshBuilder';
 import { CSGProcessor } from './CSGProcessor';
 import { STLExporterService } from './STLExporterService';
 import { downloadBlob, readFileAsArrayBuffer, readFileAsText } from '../utils/fileHelpers';
-import type { NameplateState, EngineCallbacks, BoundingBoxInfo } from './types';
+import type { NameplateState, EngineCallbacks, BoundingBoxInfo, PositionOffset, TextBoxConfig } from './types';
 import { DEFAULT_STATE } from './types';
 
 export class NameplateEngine {
@@ -34,6 +34,47 @@ export class NameplateEngine {
     this.textMeshBuilder.loadFont().catch((err) => {
       this.updateState({ error: `Failed to load font: ${err.message}` });
     });
+    this.loadBundledAssets();
+  }
+
+  private async loadBundledAssets(): Promise<void> {
+    try {
+      // Load bundled base STL
+      const stlResponse = await fetch('/nameplate-base.stl');
+      const stlBuffer = await stlResponse.arrayBuffer();
+      const geometry = this.stlImporter.loadFromArrayBuffer(stlBuffer);
+
+      this.baseGeometry = geometry;
+      this.baseBBox = STLImporter.getBoundingBoxInfo(geometry);
+
+      const material = new THREE.MeshStandardMaterial({
+        color: 0xa5d1ea,
+        roughness: 0.5,
+        metalness: 0.2,
+      });
+      this.baseMesh = new THREE.Mesh(geometry, material);
+      this.baseMesh.castShadow = true;
+      this.baseMesh.receiveShadow = true;
+      this.sceneManager.scene.add(this.baseMesh);
+      this.sceneManager.fitCameraToObject(this.baseMesh);
+
+      this.updateState({
+        isBaseLoaded: true,
+        statusMessage: 'Enter your name to get started.',
+      });
+
+      // Render default text if any
+      this.updateTextPreview();
+
+      // Load bundled company logo
+      const svgResponse = await fetch('/company-logo.svg');
+      this.svgText = await svgResponse.text();
+      this.updateLogoPreview();
+    } catch (err) {
+      this.updateState({
+        error: `Failed to load assets: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      });
+    }
   }
 
   private updateState(partial: Partial<NameplateState>): void {
@@ -62,7 +103,7 @@ export class NameplateEngine {
       this.baseBBox = STLImporter.getBoundingBoxInfo(geometry);
 
       const material = new THREE.MeshStandardMaterial({
-        color: 0xcccccc,
+        color: 0xa5d1ea,
         roughness: 0.5,
         metalness: 0.2,
       });
@@ -99,9 +140,16 @@ export class NameplateEngine {
     this.updateLogoPreview();
   }
 
-  setFontSize(size: number): void {
-    this.updateState({ fontSize: size });
+  setTextBox(index: 0 | 1 | 2, config: TextBoxConfig): void {
+    const boxes = [...this.state.textBoxes] as [TextBoxConfig, TextBoxConfig, TextBoxConfig];
+    boxes[index] = config;
+    this.updateState({ textBoxes: boxes });
     this.updateTextPreview();
+  }
+
+  setLogoPosition(position: PositionOffset): void {
+    this.updateState({ logoPosition: position });
+    this.updateLogoPreview();
   }
 
   async loadLogo(file: File): Promise<void> {
@@ -116,6 +164,15 @@ export class NameplateEngine {
     }
   }
 
+  private enableShadows(object: THREE.Object3D): void {
+    object.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+  }
+
   private updateTextPreview(): void {
     if (this.textGroup) {
       this.sceneManager.scene.remove(this.textGroup);
@@ -124,10 +181,11 @@ export class NameplateEngine {
 
     this.textGroup = this.textMeshBuilder.createMultiLineTextMeshes(
       this.state.textLines,
-      this.state.fontSize,
       this.state.embossDepth,
       this.baseBBox,
+      this.state.textBoxes,
     );
+    this.enableShadows(this.textGroup);
     this.sceneManager.scene.add(this.textGroup);
   }
 
@@ -142,7 +200,9 @@ export class NameplateEngine {
         this.svgText,
         this.state.embossDepth,
         this.baseBBox,
+        this.state.logoPosition,
       );
+      this.enableShadows(this.logoGroup);
       this.sceneManager.scene.add(this.logoGroup);
     } catch (err) {
       this.updateState({
@@ -190,6 +250,33 @@ export class NameplateEngine {
         statusMessage: 'Error during generation.',
       });
     }
+  }
+
+  resetView(): void {
+    this.sceneManager.resetView();
+  }
+
+  setDirectionalLight(x: number, y: number, z: number, intensity: number): void {
+    this.sceneManager.directionalLight.position.set(x, y, z);
+    this.sceneManager.directionalLight.intensity = intensity;
+  }
+
+  setBackLight(x: number, y: number, z: number, intensity: number): void {
+    this.sceneManager.backLight.position.set(x, y, z);
+    this.sceneManager.backLight.intensity = intensity;
+  }
+
+  setAmbientIntensity(intensity: number): void {
+    this.sceneManager.ambientLight.intensity = intensity;
+  }
+
+  getCameraInfo(): { position: { x: number; y: number; z: number }; target: { x: number; y: number; z: number } } {
+    const p = this.sceneManager.camera.position;
+    const t = this.sceneManager.controls.target;
+    return {
+      position: { x: p.x, y: p.y, z: p.z },
+      target: { x: t.x, y: t.y, z: t.z },
+    };
   }
 
   dispose(): void {

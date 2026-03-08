@@ -1,5 +1,25 @@
 const LINE_LABELS = ['First Name', 'Last Name', 'Title / Extra'] as const;
-const MAX_CHARS = 30;
+const MAX_CHARS = 20;
+
+function transformText(index: number, text: string): string {
+  // Preserve leading/trailing spaces for crude sizing
+  const leadingSpaces = text.match(/^(\s*)/)?.[0] ?? '';
+  const trailingSpaces = text.match(/(\s*)$/)?.[0] ?? '';
+  const inner = text.slice(leadingSpaces.length, text.length - trailingSpaces.length);
+
+  if (inner.length === 0) return text;
+
+  let transformed: string;
+  if (index === 0) {
+    // First Name: capitalize first letter, lowercase rest
+    transformed = inner.charAt(0).toUpperCase() + inner.slice(1).toLowerCase();
+  } else {
+    // Last Name and Title / Extra: ALL UPPERCASE
+    transformed = inner.toUpperCase();
+  }
+
+  return leadingSpaces + transformed + trailingSpaces;
+}
 
 interface Props {
   textLines: [string, string, string];
@@ -23,7 +43,7 @@ export function TextInputSection({ textLines, onTextChange, isProcessing, disabl
                 <input
                   type="text"
                   value={value}
-                  onChange={(e) => onTextChange(index, e.target.value)}
+                  onChange={(e) => onTextChange(index, transformText(index, e.target.value))}
                   maxLength={MAX_CHARS}
                   disabled={isProcessing || disabled}
                   placeholder={label}

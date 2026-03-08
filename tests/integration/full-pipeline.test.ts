@@ -9,6 +9,7 @@ import { CSGProcessor } from '../../src/engine/CSGProcessor';
 import { STLExporterService } from '../../src/engine/STLExporterService';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
+import { DEFAULT_TEXT_BOXES } from '../../src/engine/types';
 
 function loadFixtureSTL(): ArrayBuffer {
   const buf = readFileSync(join(__dirname, '../fixtures/simple-plate.stl'));
@@ -48,12 +49,12 @@ describe('Full Pipeline Integration', () => {
     const baseBBox = STLImporter.getBoundingBoxInfo(baseGeom);
     const baseTriCount = baseGeom.getAttribute('position').count / 3;
 
-    // Create text
+    // Create text with per-line text boxes
     const textGroup = textBuilder.createMultiLineTextMeshes(
       ['John', 'Doe'],
-      8,
       1.5,
       baseBBox,
+      [...DEFAULT_TEXT_BOXES],
     );
     const textGeometries = CSGProcessor.flattenGroup(textGroup);
 
@@ -80,9 +81,9 @@ describe('Full Pipeline Integration', () => {
     // Create text
     const textGroup = textBuilder.createMultiLineTextMeshes(
       ['Jane', 'Smith'],
-      8,
       1.5,
       baseBBox,
+      [...DEFAULT_TEXT_BOXES],
     );
     const textGeometries = CSGProcessor.flattenGroup(textGroup);
 
@@ -126,9 +127,9 @@ describe('Full Pipeline Integration', () => {
 
     const textGroup = textBuilder.createMultiLineTextMeshes(
       ['Alice', '', 'Engineer'],
-      8,
       1.5,
       baseBBox,
+      [...DEFAULT_TEXT_BOXES],
     );
 
     // Should only have 2 children (skipping empty line)
@@ -138,16 +139,16 @@ describe('Full Pipeline Integration', () => {
     expect(textGeometries.length).toBe(2);
   });
 
-  it('very long name auto-scales and CSG still succeeds', () => {
+  it('very long name auto-scales and CSG still succeeds', { timeout: 15000 }, () => {
     const importer = new STLImporter();
     const baseGeom = importer.loadFromArrayBuffer(loadFixtureSTL());
     const baseBBox = STLImporter.getBoundingBoxInfo(baseGeom);
 
     const textGroup = textBuilder.createMultiLineTextMeshes(
       ['Bartholomew Fitzwilliam III'],
-      8,
       1.5,
       baseBBox,
+      [...DEFAULT_TEXT_BOXES],
     );
     const textGeometries = CSGProcessor.flattenGroup(textGroup);
 

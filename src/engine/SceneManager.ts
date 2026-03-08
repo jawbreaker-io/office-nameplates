@@ -7,11 +7,14 @@ export class SceneManager {
   readonly renderer: THREE.WebGLRenderer;
   readonly controls: OrbitControls;
 
+  readonly ambientLight: THREE.AmbientLight;
+  readonly directionalLight: THREE.DirectionalLight;
+  readonly backLight: THREE.DirectionalLight;
   private animationFrameId: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xf0f0f0);
+    this.scene.background = new THREE.Color(0xffffff);
 
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
@@ -22,22 +25,30 @@ export class SceneManager {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(ambient);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
+    this.scene.add(this.ambientLight);
 
-    const directional = new THREE.DirectionalLight(0xffffff, 0.8);
-    directional.position.set(100, 200, 150);
-    this.scene.add(directional);
+    this.directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    this.directionalLight.position.set(-90, 90, 100);
+    this.directionalLight.castShadow = true;
+    this.directionalLight.shadow.mapSize.width = 2048;
+    this.directionalLight.shadow.mapSize.height = 2048;
+    this.directionalLight.shadow.camera.near = 0.1;
+    this.directionalLight.shadow.camera.far = 1000;
+    this.directionalLight.shadow.camera.left = -200;
+    this.directionalLight.shadow.camera.right = 200;
+    this.directionalLight.shadow.camera.top = 200;
+    this.directionalLight.shadow.camera.bottom = -200;
+    this.scene.add(this.directionalLight);
 
-    const backLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    backLight.position.set(-100, 100, -150);
-    this.scene.add(backLight);
-
-    // Grid helper for spatial reference
-    const grid = new THREE.GridHelper(400, 40, 0xcccccc, 0xe0e0e0);
-    this.scene.add(grid);
+    this.backLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    this.backLight.position.set(-70, 100, -150);
+    this.scene.add(this.backLight);
 
     // Controls
     this.controls = new OrbitControls(this.camera, canvas);
@@ -68,6 +79,8 @@ export class SceneManager {
     observer.observe(canvas);
   }
 
+  private lastFitTarget: { center: THREE.Vector3; distance: number } | null = null;
+
   fitCameraToObject(object: THREE.Object3D): void {
     const box = new THREE.Box3().setFromObject(object);
     const size = box.getSize(new THREE.Vector3());
@@ -77,7 +90,19 @@ export class SceneManager {
     const fov = this.camera.fov * (Math.PI / 180);
     const distance = maxDim / (2 * Math.tan(fov / 2)) * 1.5;
 
-    this.camera.position.set(center.x, center.y + distance * 0.3, center.z + distance);
+    this.lastFitTarget = { center: center.clone(), distance };
+
+    this.camera.position.set(center.x + 72.6, center.y + 30.1, center.z + 148.9);
+    this.controls.target.copy(center);
+    this.controls.update();
+  }
+
+  resetView(): void {
+    if (!this.lastFitTarget) return;
+    const { center, distance } = this.lastFitTarget;
+    // Straight-on frontal view: camera directly in front along Z axis
+    this.camera.position.set(center.x, center.y, center.z + distance);
+    this.camera.up.set(0, 1, 0);
     this.controls.target.copy(center);
     this.controls.update();
   }

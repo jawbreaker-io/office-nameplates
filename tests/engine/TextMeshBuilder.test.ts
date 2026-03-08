@@ -4,6 +4,7 @@ import { join } from 'path';
 import { TextMeshBuilder } from '../../src/engine/TextMeshBuilder';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import type { BoundingBoxInfo } from '../../src/engine/types';
+import { DEFAULT_TEXT_BOXES } from '../../src/engine/types';
 import * as THREE from 'three';
 
 // Load font synchronously for tests
@@ -83,12 +84,45 @@ describe('TextMeshBuilder', () => {
     expect(largeHeight).toBeGreaterThan(smallHeight);
   });
 
+  it('creates text mesh fit to box dimensions', () => {
+    const mesh = builder.createTextMeshFitToBox('Hello', 1.5, 40, 10);
+    expect(mesh).not.toBeNull();
+
+    mesh!.geometry.computeBoundingBox();
+    const box = mesh!.geometry.boundingBox!;
+    const width = box.max.x - box.min.x;
+    const height = box.max.y - box.min.y;
+
+    // Text should fit within the box
+    expect(width).toBeLessThanOrEqual(40 + 0.5);
+    expect(height).toBeLessThanOrEqual(10 + 0.5);
+  });
+
+  it('createTextMeshFitToBox centers geometry at origin', () => {
+    const mesh = builder.createTextMeshFitToBox('Test', 1.5, 30, 8);
+    expect(mesh).not.toBeNull();
+
+    mesh!.geometry.computeBoundingBox();
+    const box = mesh!.geometry.boundingBox!;
+    const centerX = (box.min.x + box.max.x) / 2;
+    const centerY = (box.min.y + box.max.y) / 2;
+
+    // Center should be approximately at origin
+    expect(Math.abs(centerX)).toBeLessThan(0.5);
+    expect(Math.abs(centerY)).toBeLessThan(0.5);
+  });
+
+  it('createTextMeshFitToBox returns null for empty text', () => {
+    expect(builder.createTextMeshFitToBox('', 1.5, 40, 10)).toBeNull();
+    expect(builder.createTextMeshFitToBox('   ', 1.5, 40, 10)).toBeNull();
+  });
+
   it('creates multi-line text with different Y offsets', () => {
     const group = builder.createMultiLineTextMeshes(
       ['Line 1', 'Line 2', 'Line 3'],
-      8,
       1.5,
       mockBBox,
+      [...DEFAULT_TEXT_BOXES],
     );
 
     expect(group.children.length).toBe(3);
@@ -102,9 +136,9 @@ describe('TextMeshBuilder', () => {
   it('skips empty lines in multi-line output', () => {
     const group = builder.createMultiLineTextMeshes(
       ['Line 1', '', 'Line 3'],
-      8,
       1.5,
       mockBBox,
+      [...DEFAULT_TEXT_BOXES],
     );
 
     expect(group.children.length).toBe(2);

@@ -31,10 +31,10 @@ describe('NameplateEngine', () => {
   it('initializes with default state', () => {
     const state = engine.getState();
     expect(state.isBaseLoaded).toBe(false);
-    expect(state.textLines).toEqual(['', '', '']);
+    expect(state.textLines).toEqual(['James', 'RICHARDSON', '']);
     expect(state.embossDepth).toBe(1.5);
-    expect(state.fontSize).toBe(8);
     expect(state.isProcessing).toBe(false);
+    expect(state.textBoxes).toHaveLength(3);
   });
 
   it('setTextLine updates state', () => {
@@ -56,10 +56,12 @@ describe('NameplateEngine', () => {
     expect(state.embossDepth).toBe(3.0);
   });
 
-  it('setFontSize updates state', () => {
-    engine.setFontSize(12);
+  it('setTextBox updates individual text box config', () => {
+    engine.setTextBox(1, { x: 10, y: -5, width: 60, height: 25 });
     const state = engine.getState();
-    expect(state.fontSize).toBe(12);
+    expect(state.textBoxes[1]).toEqual({ x: 10, y: -5, width: 60, height: 25 });
+    // Other boxes unchanged
+    expect(state.textBoxes[0]).toEqual({ x: 0, y: -15, width: 50, height: 25 });
   });
 
   it('generateFinalMesh throws without base STL', async () => {
