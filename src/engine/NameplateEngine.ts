@@ -242,10 +242,11 @@ export class NameplateEngine {
       if (format === '3mf') {
         // Two watertight parts via CSG: base with cutout + emboss contribution
         const [baseGeom, embossGeom] = await this.csgProcessor.unionSplit(this.baseGeometry, embossGeometries);
+        const assemblyName = [firstName, lastName].filter(Boolean).join(' ') || 'Nameplate';
         const blob = this.threeMFExporter.exportToBlob([
-          { geometry: baseGeom, material: { name: 'Base', color: '#A5D1EA' } },
-          { geometry: embossGeom, material: { name: 'Emboss', color: '#FFFFFF' } },
-        ]);
+          { name: 'Base', geometry: baseGeom, material: { name: 'Base', color: '#A5D1EA' } },
+          { name: 'Emboss', geometry: embossGeom, material: { name: 'Emboss', color: '#FFFFFF' } },
+        ], assemblyName);
         downloadBlob(blob, `${filename}.3mf`);
       } else {
         // STL: single CSG union

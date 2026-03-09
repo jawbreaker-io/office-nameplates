@@ -10,8 +10,8 @@ function makeBox(w = 10, h = 10, d = 10): THREE.BufferGeometry {
 
 function makeParts() {
   return [
-    { geometry: makeBox(), material: { name: 'Base', color: '#A5D1EA' } },
-    { geometry: makeBox(5, 5, 5), material: { name: 'Emboss', color: '#FFFFFF' } },
+    { name: 'Base', geometry: makeBox(), material: { name: 'Base', color: '#A5D1EA' } },
+    { name: 'Emboss', geometry: makeBox(5, 5, 5), material: { name: 'Emboss', color: '#FFFFFF' } },
   ];
 }
 
@@ -38,8 +38,8 @@ describe('ThreeMFExporterService', () => {
     const unzipped = unzipSync(data);
     const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
 
-    expect(modelXml).toContain('object id="1"');
-    expect(modelXml).toContain('object id="2"');
+    expect(modelXml).toContain('object id="1" name="Base"');
+    expect(modelXml).toContain('object id="2" name="Emboss"');
     expect(modelXml).toContain('<components>');
     expect(modelXml).toContain('component objectid="1"');
     expect(modelXml).toContain('component objectid="2"');
@@ -77,6 +77,24 @@ describe('ThreeMFExporterService', () => {
     expect(modelXml).toContain('<triangles>');
     expect(modelXml).toContain('<vertex');
     expect(modelXml).toContain('<triangle');
+  });
+
+  it('assembly object uses provided name', () => {
+    const exporter = new ThreeMFExporterService();
+    const data = exporter.exportToUint8Array(makeParts(), 'John Doe');
+    const unzipped = unzipSync(data);
+    const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
+
+    expect(modelXml).toContain('name="John Doe"');
+  });
+
+  it('assembly object defaults to Nameplate when no name provided', () => {
+    const exporter = new ThreeMFExporterService();
+    const data = exporter.exportToUint8Array(makeParts());
+    const unzipped = unzipSync(data);
+    const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
+
+    expect(modelXml).toContain('name="Nameplate"');
   });
 
   it('exportToBlob returns a Blob with correct MIME type', () => {

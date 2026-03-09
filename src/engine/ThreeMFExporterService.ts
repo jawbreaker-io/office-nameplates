@@ -7,18 +7,19 @@ export interface ThreeMFMaterial {
 }
 
 export interface ThreeMFPart {
+  name: string;
   geometry: THREE.BufferGeometry;
   material: ThreeMFMaterial;
 }
 
 export class ThreeMFExporterService {
-  exportToBlob(parts: ThreeMFPart[]): Blob {
-    const data = this.exportToUint8Array(parts);
+  exportToBlob(parts: ThreeMFPart[], assemblyName?: string): Blob {
+    const data = this.exportToUint8Array(parts, assemblyName);
     return new Blob([data], { type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml' });
   }
 
-  exportToUint8Array(parts: ThreeMFPart[]): Uint8Array {
-    const modelXml = this.buildModelXml(parts);
+  exportToUint8Array(parts: ThreeMFPart[], assemblyName?: string): Uint8Array {
+    const modelXml = this.buildModelXml(parts, assemblyName);
 
     const contentTypes = `<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -68,7 +69,7 @@ ${indent}  </triangles>
 ${indent}</mesh>`;
   }
 
-  private buildModelXml(parts: ThreeMFPart[]): string {
+  private buildModelXml(parts: ThreeMFPart[], assemblyName?: string): string {
     const matId = parts.length + 2;
     const assemblyId = parts.length + 1;
 
@@ -79,7 +80,7 @@ ${indent}</mesh>`;
     const objects = parts.map((part, i) => {
       const objId = i + 1;
       const meshXml = this.buildMeshXml(part.geometry, '      ');
-      return `    <object id="${objId}" type="model" pid="${matId}" pindex="${i}">
+      return `    <object id="${objId}" name="${part.name}" type="model" pid="${matId}" pindex="${i}">
 ${meshXml}
     </object>`;
     }).join('\n');
@@ -95,7 +96,7 @@ ${meshXml}
 ${bases}
     </basematerials>
 ${objects}
-    <object id="${assemblyId}" type="model">
+    <object id="${assemblyId}" name="${assemblyName || 'Nameplate'}" type="model">
       <components>
 ${components}
       </components>
