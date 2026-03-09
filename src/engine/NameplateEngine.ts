@@ -233,11 +233,14 @@ export class NameplateEngine {
       }
 
       // Run CSG union
-      const finalGeometry = this.csgProcessor.union(this.baseGeometry, embossGeometries);
+      const finalGeometry = await this.csgProcessor.union(this.baseGeometry, embossGeometries);
 
       // Export
       const blob = this.stlExporter.exportToBlob(finalGeometry);
-      downloadBlob(blob, 'nameplate.stl');
+      const firstName = this.state.textLines[0].trim();
+      const lastName = this.state.textLines[1].trim();
+      const filename = [firstName, lastName].filter(Boolean).join('_').replace(/\s+/g, '_') || 'nameplate';
+      downloadBlob(blob, `${filename}.stl`);
 
       this.updateState({
         isProcessing: false,

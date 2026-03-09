@@ -11,24 +11,23 @@ function makeBox(w: number, h: number, d: number, position?: THREE.Vector3): THR
 }
 
 describe('CSGProcessor', () => {
-  it('union of two box geometries produces more vertices than either input', () => {
+  it('union of two box geometries produces more triangles than base', async () => {
     const processor = new CSGProcessor();
     const base = makeBox(10, 10, 10);
     const add = makeBox(5, 5, 5, new THREE.Vector3(5, 5, 5));
 
-    const result = processor.union(base, [add]);
-    const resultVertexCount = result.getAttribute('position').count;
-    const baseVertexCount = base.getAttribute('position').count;
-
-    expect(resultVertexCount).toBeGreaterThan(baseVertexCount);
+    const result = await processor.union(base, [add]);
+    const resultTriCount = result.index!.count / 3;
+    // BoxGeometry: 12 triangles (6 faces × 2 tris)
+    expect(resultTriCount).toBeGreaterThan(12);
   });
 
-  it('union with empty geometry list returns base geometry unchanged', () => {
+  it('union with empty geometry list returns base geometry unchanged', async () => {
     const processor = new CSGProcessor();
     const base = makeBox(10, 10, 10);
     const baseVertexCount = base.getAttribute('position').count;
 
-    const result = processor.union(base, []);
+    const result = await processor.union(base, []);
     const resultVertexCount = result.getAttribute('position').count;
 
     expect(resultVertexCount).toBe(baseVertexCount);

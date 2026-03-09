@@ -43,13 +43,12 @@ describe('Full Pipeline Integration', () => {
     (textBuilder as unknown as { font: unknown }).font = font;
   });
 
-  it('load STL → add text (2 lines) → CSG → export → valid STL with more triangles', () => {
+  it('load STL → add text (2 lines) → CSG → export → valid STL with more triangles', async () => {
     const importer = new STLImporter();
     const baseGeom = importer.loadFromArrayBuffer(loadFixtureSTL());
     const baseBBox = STLImporter.getBoundingBoxInfo(baseGeom);
     const baseTriCount = baseGeom.getAttribute('position').count / 3;
 
-    // Create text with per-line text boxes
     const textGroup = textBuilder.createMultiLineTextMeshes(
       ['John', 'Doe'],
       1.5,
@@ -58,11 +57,9 @@ describe('Full Pipeline Integration', () => {
     );
     const textGeometries = CSGProcessor.flattenGroup(textGroup);
 
-    // CSG union
     const processor = new CSGProcessor();
-    const result = processor.union(baseGeom, textGeometries);
+    const result = await processor.union(baseGeom, textGeometries);
 
-    // Export
     const exporter = new STLExporterService();
     const buffer = exporter.exportToArrayBuffer(result);
 
@@ -73,12 +70,11 @@ describe('Full Pipeline Integration', () => {
     expect(resultTriCount).toBeGreaterThan(baseTriCount);
   });
 
-  it('load STL → add text + logo → CSG → export → valid STL', () => {
+  it('load STL → add text + logo → CSG → export → valid STL', async () => {
     const importer = new STLImporter();
     const baseGeom = importer.loadFromArrayBuffer(loadFixtureSTL());
     const baseBBox = STLImporter.getBoundingBoxInfo(baseGeom);
 
-    // Create text
     const textGroup = textBuilder.createMultiLineTextMeshes(
       ['Jane', 'Smith'],
       1.5,
@@ -87,28 +83,25 @@ describe('Full Pipeline Integration', () => {
     );
     const textGeometries = CSGProcessor.flattenGroup(textGroup);
 
-    // Create logo
     const logoBuilder = new LogoMeshBuilder();
     const logoGroup = logoBuilder.createLogoMesh(loadFixtureSVG(), 1.5, baseBBox);
     const logoGeometries = CSGProcessor.flattenGroup(logoGroup);
 
-    // CSG union
     const allEmboss = [...textGeometries, ...logoGeometries];
     const processor = new CSGProcessor();
-    const result = processor.union(baseGeom, allEmboss);
+    const result = await processor.union(baseGeom, allEmboss);
 
-    // Export
     const exporter = new STLExporterService();
     const buffer = exporter.exportToArrayBuffer(result);
     expect(isValidBinarySTL(buffer)).toBe(true);
   });
 
-  it('load STL → no text, no logo → export → output matches input triangle count', () => {
+  it('load STL → no text, no logo → export → output matches input triangle count', async () => {
     const importer = new STLImporter();
     const baseGeom = importer.loadFromArrayBuffer(loadFixtureSTL());
 
     const processor = new CSGProcessor();
-    const result = processor.union(baseGeom, []);
+    const result = await processor.union(baseGeom, []);
 
     const exporter = new STLExporterService();
     const buffer = exporter.exportToArrayBuffer(result);
@@ -132,14 +125,13 @@ describe('Full Pipeline Integration', () => {
       [...DEFAULT_TEXT_BOXES],
     );
 
-    // Should only have 2 children (skipping empty line)
     expect(textGroup.children.length).toBe(2);
 
     const textGeometries = CSGProcessor.flattenGroup(textGroup);
     expect(textGeometries.length).toBe(2);
   });
 
-  it('very long name auto-scales and CSG still succeeds', { timeout: 15000 }, () => {
+  it('very long name auto-scales and CSG still succeeds', { timeout: 15000 }, async () => {
     const importer = new STLImporter();
     const baseGeom = importer.loadFromArrayBuffer(loadFixtureSTL());
     const baseBBox = STLImporter.getBoundingBoxInfo(baseGeom);
@@ -153,7 +145,7 @@ describe('Full Pipeline Integration', () => {
     const textGeometries = CSGProcessor.flattenGroup(textGroup);
 
     const processor = new CSGProcessor();
-    const result = processor.union(baseGeom, textGeometries);
+    const result = await processor.union(baseGeom, textGeometries);
 
     const exporter = new STLExporterService();
     const buffer = exporter.exportToArrayBuffer(result);
