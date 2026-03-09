@@ -2,10 +2,15 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { NameplateEngine } from '../engine/NameplateEngine';
 import type { NameplateState, PositionOffset, TextBoxConfig } from '../engine/types';
 import { DEFAULT_STATE } from '../engine/types';
+import { getRandomAuthor } from '../utils/randomAuthor';
 
 export function useNameplateEngine(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const engineRef = useRef<NameplateEngine | null>(null);
-  const [state, setState] = useState<NameplateState>({ ...DEFAULT_STATE });
+  const [initialAuthor] = useState(() => getRandomAuthor());
+  const [state, setState] = useState<NameplateState>(() => ({
+    ...DEFAULT_STATE,
+    textLines: [initialAuthor[0], initialAuthor[1], ''],
+  }));
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -18,11 +23,15 @@ export function useNameplateEngine(canvasRef: React.RefObject<HTMLCanvasElement 
     });
     engineRef.current = engine;
 
+    // Sync random author to engine so 3D preview matches UI
+    engine.setTextLine(0, initialAuthor[0]);
+    engine.setTextLine(1, initialAuthor[1]);
+
     return () => {
       engine.dispose();
       engineRef.current = null;
     };
-  }, [canvasRef]);
+  }, [canvasRef, initialAuthor]);
 
   const loadBaseSTL = useCallback((file: File) => {
     engineRef.current?.loadBaseSTL(file);
