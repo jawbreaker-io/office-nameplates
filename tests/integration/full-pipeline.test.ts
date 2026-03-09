@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import * as THREE from 'three';
 import { STLImporter } from '../../src/engine/STLImporter';
 import { TextMeshBuilder } from '../../src/engine/TextMeshBuilder';
 import { LogoMeshBuilder } from '../../src/engine/LogoMeshBuilder';
 import { CSGProcessor } from '../../src/engine/CSGProcessor';
 import { STLExporterService } from '../../src/engine/STLExporterService';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import { DEFAULT_TEXT_BOXES } from '../../src/engine/types';
 

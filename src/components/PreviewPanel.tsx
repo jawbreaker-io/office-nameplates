@@ -1,10 +1,27 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { useNameplateEngine } from '../hooks/useNameplateEngine';
 import { ControlPanel } from './ControlPanel';
 
 export function PreviewPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = useNameplateEngine(canvasRef);
+
+  // Populate text fields from URL query params (shared link)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fn = params.get('fn');
+    const ln = params.get('ln');
+    const t = params.get('t');
+
+    if (fn !== null || ln !== null || t !== null) {
+      if (fn !== null) engine.setTextLine(0, fn);
+      if (ln !== null) engine.setTextLine(1, ln);
+      if (t !== null) engine.setTextLine(2, t);
+
+      // Clean the URL bar without triggering a reload
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col md:flex-row h-screen">
