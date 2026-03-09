@@ -6,22 +6,19 @@ export interface ThreeMFMaterial {
   color: string; // hex color e.g. "#A5D1EA"
 }
 
+export interface ThreeMFPart {
+  geometry: THREE.BufferGeometry;
+  material: ThreeMFMaterial;
+}
+
 export class ThreeMFExporterService {
-  exportToBlob(
-    geometry: THREE.BufferGeometry,
-    triangleMaterials?: Uint8Array,
-    materials?: ThreeMFMaterial[],
-  ): Blob {
-    const data = this.exportToUint8Array(geometry, triangleMaterials, materials);
+  exportToBlob(parts: ThreeMFPart[]): Blob {
+    const data = this.exportToUint8Array(parts);
     return new Blob([data], { type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml' });
   }
 
-  exportToUint8Array(
-    geometry: THREE.BufferGeometry,
-    triangleMaterials?: Uint8Array,
-    materials?: ThreeMFMaterial[],
-  ): Uint8Array {
-    const modelXml = this.buildModelXml(geometry, triangleMaterials, materials);
+  exportToUint8Array(parts: ThreeMFPart[]): Uint8Array {
+    const modelXml = this.buildModelXml(parts);
 
     const contentTypes = `<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -41,60 +38,71 @@ export class ThreeMFExporterService {
     });
   }
 
-  private buildModelXml(
-    geometry: THREE.BufferGeometry,
-    triangleMaterials?: Uint8Array,
-    materials?: ThreeMFMaterial[],
-  ): string {
+  private buildMeshXml(geometry: THREE.BufferGeometry, indent: string): string {
     const posAttr = geometry.getAttribute('position');
     const index = geometry.index;
-    const hasColors = triangleMaterials && materials && materials.length > 0;
 
     const vertices: string[] = [];
     for (let i = 0; i < posAttr.count; i++) {
-      vertices.push(`        <vertex x="${posAttr.getX(i)}" y="${posAttr.getY(i)}" z="${posAttr.getZ(i)}" />`);
+      vertices.push(`${indent}    <vertex x="${posAttr.getX(i)}" y="${posAttr.getY(i)}" z="${posAttr.getZ(i)}" />`);
     }
 
     const triangles: string[] = [];
     if (index) {
       for (let i = 0; i < index.count; i += 3) {
-        const triIdx = i / 3;
-        const colorAttr = hasColors ? ` pid="1" p1="${triangleMaterials[triIdx]}"` : '';
-        triangles.push(`        <triangle v1="${index.getX(i)}" v2="${index.getX(i + 1)}" v3="${index.getX(i + 2)}"${colorAttr} />`);
+        triangles.push(`${indent}    <triangle v1="${index.getX(i)}" v2="${index.getX(i + 1)}" v3="${index.getX(i + 2)}" />`);
       }
     } else {
       for (let i = 0; i < posAttr.count; i += 3) {
-        const triIdx = i / 3;
-        const colorAttr = hasColors ? ` pid="1" p1="${triangleMaterials[triIdx]}"` : '';
-        triangles.push(`        <triangle v1="${i}" v2="${i + 1}" v3="${i + 2}"${colorAttr} />`);
+        triangles.push(`${indent}    <triangle v1="${i}" v2="${i + 1}" v3="${i + 2}" />`);
       }
     }
 
-    let materialsXml = '';
-    if (hasColors) {
-      const bases = materials.map((m) => `      <base name="${m.name}" displaycolor="${m.color}" />`).join('\n');
-      materialsXml = `
-    <basematerials id="1">
-${bases}
-    </basematerials>`;
-    }
+    return `${indent}<mesh>
+${indent}  <vertices>
+${vertices.join('\n')}
+${indent}  </vertices>
+${indent}  <triangles>
+${triangles.join('\n')}
+${indent}  </triangles>
+${indent}</mesh>`;
+  }
+
+  private buildModelXml(parts: ThreeMFPart[]): string {
+    const matId = parts.length + 2;
+    const assemblyId = parts.length + 1;
+
+    const bases = parts.map((p) =>
+      `      <base name="${p.material.name}" displaycolor="${p.material.color}" />`
+    ).join('\n');
+
+    const objects = parts.map((part, i) => {
+      const objId = i + 1;
+      const meshXml = this.buildMeshXml(part.geometry, '      ');
+      return `    <object id="${objId}" type="model" pid="${matId}" pindex="${i}">
+${meshXml}
+    </object>`;
+    }).join('\n');
+
+    const components = parts.map((_, i) =>
+      `        <component objectid="${i + 1}" />`
+    ).join('\n');
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
-  <resources>${materialsXml}
-    <object id="2" type="model">
-      <mesh>
-        <vertices>
-${vertices.join('\n')}
-        </vertices>
-        <triangles>
-${triangles.join('\n')}
-        </triangles>
-      </mesh>
+  <resources>
+    <basematerials id="${matId}">
+${bases}
+    </basematerials>
+${objects}
+    <object id="${assemblyId}" type="model">
+      <components>
+${components}
+      </components>
     </object>
   </resources>
   <build>
-    <item objectid="2" />
+    <item objectid="${assemblyId}" />
   </build>
 </model>`;
   }

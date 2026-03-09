@@ -234,21 +234,22 @@ export class NameplateEngine {
         embossGeometries.push(...CSGProcessor.flattenGroup(this.logoGroup));
       }
 
-      // Run CSG union
-      const { geometry: finalGeometry, triangleMaterials } = await this.csgProcessor.union(this.baseGeometry, embossGeometries);
-
       // Export
       const firstName = this.state.textLines[0].trim();
       const lastName = this.state.textLines[1].trim();
       const filename = [firstName, lastName].filter(Boolean).join('_').replace(/\s+/g, '_') || 'nameplate';
 
       if (format === '3mf') {
-        const blob = this.threeMFExporter.exportToBlob(finalGeometry, triangleMaterials, [
-          { name: 'Base', color: '#A5D1EA' },
-          { name: 'Emboss', color: '#FFFFFF' },
+        // Two watertight parts via CSG: base with cutout + emboss contribution
+        const [baseGeom, embossGeom] = await this.csgProcessor.unionSplit(this.baseGeometry, embossGeometries);
+        const blob = this.threeMFExporter.exportToBlob([
+          { geometry: baseGeom, material: { name: 'Base', color: '#A5D1EA' } },
+          { geometry: embossGeom, material: { name: 'Emboss', color: '#FFFFFF' } },
         ]);
         downloadBlob(blob, `${filename}.3mf`);
       } else {
+        // STL: single CSG union
+        const finalGeometry = await this.csgProcessor.union(this.baseGeometry, embossGeometries);
         const blob = this.stlExporter.exportToBlob(finalGeometry);
         downloadBlob(blob, `${filename}.stl`);
       }

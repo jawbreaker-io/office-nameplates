@@ -25,12 +25,6 @@ async function getModule(): Promise<ManifoldToplevel> {
   return manifoldModule;
 }
 
-export interface CSGResult {
-  geometry: THREE.BufferGeometry;
-  /** Per-triangle material index: 0 = base, 1 = emboss */
-  triangleMaterials: Uint8Array;
-}
-
 export class CSGProcessor {
   private modulePromise: Promise<ManifoldToplevel>;
 
@@ -80,10 +74,7 @@ export class CSGProcessor {
     return new wasm.Manifold(mesh);
   }
 
-  private fromManifoldWithColors(
-    manifold: { getMesh(): { numVert: number; numTri: number; triVerts: Uint32Array; runIndex: Uint32Array; runOriginalID: Uint32Array; position(i: number): Float32Array } },
-    baseOriginalID: number,
-  ): CSGResult {
+  private fromManifold(manifold: { getMesh(): { numVert: number; numTri: number; triVerts: Uint32Array; position(i: number): Float32Array } }): THREE.BufferGeometry {
     const mesh = manifold.getMesh();
 
     const positions = new Float32Array(mesh.numVert * 3);
@@ -99,36 +90,10 @@ export class CSGProcessor {
     geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(mesh.triVerts), 1));
     geometry.computeVertexNormals();
 
-    // Build per-triangle material index from run data
-    const triangleMaterials = new Uint8Array(mesh.numTri);
-    const { runIndex, runOriginalID } = mesh;
-    for (let run = 0; run < runOriginalID.length; run++) {
-      const startTri = runIndex[run] / 3;
-      const endTri = (run + 1 < runIndex.length ? runIndex[run + 1] : mesh.numTri * 3) / 3;
-      const materialIdx = runOriginalID[run] === baseOriginalID ? 0 : 1;
-      for (let t = startTri; t < endTri; t++) {
-        triangleMaterials[t] = materialIdx;
-      }
-    }
-
-    return { geometry, triangleMaterials };
+    return geometry;
   }
 
-  async union(baseGeometry: THREE.BufferGeometry, embossGeometries: THREE.BufferGeometry[]): Promise<CSGResult> {
-    if (embossGeometries.length === 0) {
-      const geom = baseGeometry.clone();
-      const triCount = geom.index
-        ? geom.index.count / 3
-        : geom.getAttribute('position').count / 3;
-      return {
-        geometry: geom,
-        triangleMaterials: new Uint8Array(triCount), // all 0 = base
-      };
-    }
-
-    const wasm = await this.modulePromise;
-
-    // Prepare and merge all emboss geometries into one
+  private prepareManifolds(wasm: ManifoldToplevel, baseGeometry: THREE.BufferGeometry, embossGeometries: THREE.BufferGeometry[]) {
     const prepared = embossGeometries.map((g) => this.prepareGeometry(g));
     const mergedEmboss = prepared.length === 1
       ? prepared[0]
@@ -136,19 +101,23 @@ export class CSGProcessor {
 
     const preparedBase = this.prepareGeometry(baseGeometry);
 
-    // Convert to Manifold — asOriginal() assigns stable IDs for tracking through CSG
-    const baseManifold = this.toManifold(wasm, preparedBase).asOriginal();
-    const embossManifold = this.toManifold(wasm, mergedEmboss).asOriginal();
+    return {
+      baseManifold: this.toManifold(wasm, preparedBase),
+      embossManifold: this.toManifold(wasm, mergedEmboss),
+    };
+  }
 
-    const baseOriginalID = baseManifold.originalID();
+  async union(baseGeometry: THREE.BufferGeometry, embossGeometries: THREE.BufferGeometry[]): Promise<THREE.BufferGeometry> {
+    if (embossGeometries.length === 0) {
+      return baseGeometry.clone();
+    }
+
+    const wasm = await this.modulePromise;
+    const { baseManifold, embossManifold } = this.prepareManifolds(wasm, baseGeometry, embossGeometries);
 
     let result;
     try {
       result = baseManifold.add(embossManifold);
-      const status = result.status();
-      if (status !== 'NoError') {
-        throw new Error(`Manifold operation returned status: ${status}`);
-      }
     } catch (err) {
       baseManifold.delete();
       embossManifold.delete();
@@ -158,15 +127,55 @@ export class CSGProcessor {
       );
     }
 
-    // Convert back to Three.js geometry with color tracking
-    const csgResult = this.fromManifoldWithColors(result, baseOriginalID);
+    const outputGeometry = this.fromManifold(result);
 
-    // Clean up WASM objects
     baseManifold.delete();
     embossManifold.delete();
     result.delete();
 
-    return csgResult;
+    return outputGeometry;
+  }
+
+  /**
+   * Produces two watertight geometries via CSG:
+   *   basePart  = base − emboss  (base plate with emboss footprint cut out)
+   *   embossPart = union − basePart  (the emboss contribution)
+   * Both are independently manifold.
+   */
+  async unionSplit(baseGeometry: THREE.BufferGeometry, embossGeometries: THREE.BufferGeometry[]): Promise<[THREE.BufferGeometry, THREE.BufferGeometry]> {
+    if (embossGeometries.length === 0) {
+      return [baseGeometry.clone(), new THREE.BufferGeometry()];
+    }
+
+    const wasm = await this.modulePromise;
+    const { baseManifold, embossManifold } = this.prepareManifolds(wasm, baseGeometry, embossGeometries);
+
+    let unionResult, basePart, embossPart;
+    try {
+      unionResult = baseManifold.add(embossManifold);
+      basePart = baseManifold.subtract(embossManifold);
+      embossPart = unionResult.subtract(basePart);
+    } catch (err) {
+      baseManifold.delete();
+      embossManifold.delete();
+      unionResult?.delete();
+      basePart?.delete();
+      throw new Error(
+        `CSG split failed: ${err instanceof Error ? err.message : 'Unknown error'}. ` +
+        'The input mesh may not be manifold.',
+      );
+    }
+
+    const baseGeom = this.fromManifold(basePart);
+    const embossGeom = this.fromManifold(embossPart);
+
+    baseManifold.delete();
+    embossManifold.delete();
+    unionResult.delete();
+    basePart.delete();
+    embossPart.delete();
+
+    return [baseGeom, embossGeom];
   }
 
   /**

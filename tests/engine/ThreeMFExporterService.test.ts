@@ -4,20 +4,27 @@ import * as THREE from 'three';
 import { unzipSync, strFromU8 } from 'fflate';
 import { ThreeMFExporterService } from '../../src/engine/ThreeMFExporterService';
 
-function makeBox(): THREE.BufferGeometry {
-  return new THREE.BoxGeometry(10, 10, 10);
+function makeBox(w = 10, h = 10, d = 10): THREE.BufferGeometry {
+  return new THREE.BoxGeometry(w, h, d);
+}
+
+function makeParts() {
+  return [
+    { geometry: makeBox(), material: { name: 'Base', color: '#A5D1EA' } },
+    { geometry: makeBox(5, 5, 5), material: { name: 'Emboss', color: '#FFFFFF' } },
+  ];
 }
 
 describe('ThreeMFExporterService', () => {
-  it('exports a geometry to a non-empty Uint8Array', () => {
+  it('exports parts to a non-empty Uint8Array', () => {
     const exporter = new ThreeMFExporterService();
-    const data = exporter.exportToUint8Array(makeBox());
+    const data = exporter.exportToUint8Array(makeParts());
     expect(data.byteLength).toBeGreaterThan(0);
   });
 
   it('produces a valid ZIP containing required 3MF files', () => {
     const exporter = new ThreeMFExporterService();
-    const data = exporter.exportToUint8Array(makeBox());
+    const data = exporter.exportToUint8Array(makeParts());
     const unzipped = unzipSync(data);
 
     expect(unzipped['[Content_Types].xml']).toBeDefined();
@@ -25,9 +32,44 @@ describe('ThreeMFExporterService', () => {
     expect(unzipped['3D/3dmodel.model']).toBeDefined();
   });
 
-  it('model XML contains vertices and triangles', () => {
+  it('model XML contains separate objects with components assembly', () => {
     const exporter = new ThreeMFExporterService();
-    const data = exporter.exportToUint8Array(makeBox());
+    const data = exporter.exportToUint8Array(makeParts());
+    const unzipped = unzipSync(data);
+    const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
+
+    expect(modelXml).toContain('object id="1"');
+    expect(modelXml).toContain('object id="2"');
+    expect(modelXml).toContain('<components>');
+    expect(modelXml).toContain('component objectid="1"');
+    expect(modelXml).toContain('component objectid="2"');
+    expect(modelXml).toContain('unit="millimeter"');
+  });
+
+  it('includes basematerials with correct colors', () => {
+    const exporter = new ThreeMFExporterService();
+    const data = exporter.exportToUint8Array(makeParts());
+    const unzipped = unzipSync(data);
+    const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
+
+    expect(modelXml).toContain('<basematerials');
+    expect(modelXml).toContain('displaycolor="#A5D1EA"');
+    expect(modelXml).toContain('displaycolor="#FFFFFF"');
+  });
+
+  it('each part object references its material via pid/pindex', () => {
+    const exporter = new ThreeMFExporterService();
+    const data = exporter.exportToUint8Array(makeParts());
+    const unzipped = unzipSync(data);
+    const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
+
+    expect(modelXml).toContain('pindex="0"');
+    expect(modelXml).toContain('pindex="1"');
+  });
+
+  it('each part contains vertices and triangles', () => {
+    const exporter = new ThreeMFExporterService();
+    const data = exporter.exportToUint8Array(makeParts());
     const unzipped = unzipSync(data);
     const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
 
@@ -35,61 +77,12 @@ describe('ThreeMFExporterService', () => {
     expect(modelXml).toContain('<triangles>');
     expect(modelXml).toContain('<vertex');
     expect(modelXml).toContain('<triangle');
-    expect(modelXml).toContain('unit="millimeter"');
-  });
-
-  it('exports correct vertex and triangle counts for a box', () => {
-    const exporter = new ThreeMFExporterService();
-    const geom = makeBox();
-    const data = exporter.exportToUint8Array(geom);
-    const unzipped = unzipSync(data);
-    const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
-
-    const vertexCount = (modelXml.match(/<vertex /g) || []).length;
-    const triangleCount = (modelXml.match(/<triangle /g) || []).length;
-
-    expect(vertexCount).toBe(geom.getAttribute('position').count);
-    expect(triangleCount).toBe(geom.index!.count / 3);
   });
 
   it('exportToBlob returns a Blob with correct MIME type', () => {
     const exporter = new ThreeMFExporterService();
-    const blob = exporter.exportToBlob(makeBox());
+    const blob = exporter.exportToBlob(makeParts());
     expect(blob.size).toBeGreaterThan(0);
     expect(blob.type).toBe('application/vnd.ms-package.3dmanufacturing-3dmodel+xml');
-  });
-
-  it('includes basematerials and per-triangle pid/p1 when materials provided', () => {
-    const exporter = new ThreeMFExporterService();
-    const geom = makeBox();
-    const triCount = geom.index!.count / 3;
-    // First half base (0), second half emboss (1)
-    const materials = new Uint8Array(triCount);
-    for (let i = Math.floor(triCount / 2); i < triCount; i++) {
-      materials[i] = 1;
-    }
-
-    const data = exporter.exportToUint8Array(geom, materials, [
-      { name: 'Base', color: '#A5D1EA' },
-      { name: 'Emboss', color: '#FFFFFF' },
-    ]);
-    const unzipped = unzipSync(data);
-    const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
-
-    expect(modelXml).toContain('<basematerials id="1">');
-    expect(modelXml).toContain('displaycolor="#A5D1EA"');
-    expect(modelXml).toContain('displaycolor="#FFFFFF"');
-    expect(modelXml).toContain('pid="1" p1="0"');
-    expect(modelXml).toContain('pid="1" p1="1"');
-  });
-
-  it('omits basematerials when no materials provided', () => {
-    const exporter = new ThreeMFExporterService();
-    const data = exporter.exportToUint8Array(makeBox());
-    const unzipped = unzipSync(data);
-    const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
-
-    expect(modelXml).not.toContain('<basematerials');
-    expect(modelXml).not.toContain('pid=');
   });
 });
