@@ -33,17 +33,17 @@ export class NameplateEngine {
   constructor(canvas: HTMLCanvasElement, callbacks: EngineCallbacks) {
     this.sceneManager = new SceneManager(canvas);
     this.callbacks = callbacks;
-    this.textMeshBuilder.loadFont().catch((err) => {
-      this.updateState({ error: `Failed to load font: ${err.message}` });
-    });
     this.loadBundledAssets();
   }
 
   private async loadBundledAssets(): Promise<void> {
     try {
-      // Load bundled base STL
-      const stlResponse = await fetch('/nameplate-base.stl');
-      const stlBuffer = await stlResponse.arrayBuffer();
+      // Load font and base STL in parallel so the font is ready
+      // before updateTextPreview() runs (prevents missing-text race)
+      const [, stlBuffer] = await Promise.all([
+        this.textMeshBuilder.loadFont(),
+        fetch('/nameplate-base.stl').then((r) => r.arrayBuffer()),
+      ]);
       const geometry = this.stlImporter.loadFromArrayBuffer(stlBuffer);
 
       this.baseGeometry = geometry;

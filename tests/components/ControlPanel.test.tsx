@@ -19,20 +19,41 @@ describe('ControlPanel', () => {
     expect(screen.getByText('Name Text')).toBeInTheDocument();
     expect(screen.getByText('Share Nameplate')).toBeInTheDocument();
     expect(screen.getByText('Download Files')).toBeInTheDocument();
+    // Download buttons are hidden by default
+    expect(screen.queryByText('Download 3MF')).not.toBeInTheDocument();
+    expect(screen.queryByText('STL')).not.toBeInTheDocument();
+  });
+
+  it('reveals download buttons when Download Files is clicked', async () => {
+    render(<ControlPanel engine={mockEngine} />);
+
+    expect(screen.queryByText('Download 3MF')).not.toBeInTheDocument();
+
+    await act(async () => {
+      screen.getByText('Download Files').click();
+    });
+
     expect(screen.getByText('Download 3MF')).toBeInTheDocument();
     expect(screen.getByText('STL')).toBeInTheDocument();
   });
 
-  it('disables text inputs and export buttons when no base STL loaded', () => {
+  it('disables text inputs when no base STL loaded', () => {
     render(<ControlPanel engine={mockEngine} />);
 
-    // Text inputs should be disabled
     const textInputs = screen.getAllByRole('textbox');
     textInputs.forEach((input) => {
       expect(input).toBeDisabled();
     });
+  });
 
-    // Export buttons should be disabled, but Share button should be enabled
+  it('disables export buttons when no base STL loaded', async () => {
+    render(<ControlPanel engine={mockEngine} />);
+
+    // Expand download section first
+    await act(async () => {
+      screen.getByText('Download Files').click();
+    });
+
     const exportButtons = screen.getAllByRole('button').filter(
       (btn) => btn.textContent === 'Download 3MF' || btn.textContent === 'STL'
     );

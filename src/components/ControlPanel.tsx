@@ -19,6 +19,7 @@ export function ControlPanel({ engine }: Props) {
   const { state } = engine;
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+  const [showDownloads, setShowDownloads] = useState(false);
 
   const handleShare = () => {
     const url = buildShareUrl(state.textLines);
@@ -54,12 +55,29 @@ export function ControlPanel({ engine }: Props) {
       </button>
 
       <div className="border-t border-gray-200 pt-4">
-        <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Download Files</h3>
-        <ExportButton
-          onGenerate={engine.generateFinalMesh}
-          isProcessing={state.isProcessing}
-          disabled={!state.isBaseLoaded}
-        />
+        <button
+          onClick={() => setShowDownloads(!showDownloads)}
+          className="flex items-center gap-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide
+            hover:text-gray-600 transition-colors w-full"
+        >
+          <svg
+            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            className={`transition-transform ${showDownloads ? 'rotate-90' : ''}`}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          Download Files
+        </button>
+        {showDownloads && (
+          <div className="mt-2">
+            <ExportButton
+              onGenerate={engine.generateFinalMesh}
+              isProcessing={state.isProcessing}
+              disabled={!state.isBaseLoaded}
+            />
+          </div>
+        )}
       </div>
 
       {showShareModal && (
