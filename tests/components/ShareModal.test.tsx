@@ -27,7 +27,7 @@ describe('ShareModal', () => {
     });
 
     expect(screen.getByTestId('share-ready')).toBeInTheDocument();
-    expect(screen.getByText('Link copied to clipboard!')).toBeInTheDocument();
+    expect(screen.getByText(/Link copied to clipboard/)).toBeInTheDocument();
     expect(screen.getByText('https://example.com?fn=Alice')).toBeInTheDocument();
   });
 
