@@ -40,8 +40,8 @@ export function useNameplateEngine(canvasRef: React.RefObject<HTMLCanvasElement 
     engineRef.current?.loadLogo(file);
   }, []);
 
-  const generateFinalMesh = useCallback(() => {
-    return engineRef.current?.generateFinalMesh();
+  const generateFinalMesh = useCallback((format: 'stl' | '3mf' = '3mf') => {
+    return engineRef.current?.generateFinalMesh(format);
   }, []);
 
   const resetView = useCallback(() => {

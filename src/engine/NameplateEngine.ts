@@ -5,6 +5,7 @@ import { TextMeshBuilder } from './TextMeshBuilder';
 import { LogoMeshBuilder } from './LogoMeshBuilder';
 import { CSGProcessor } from './CSGProcessor';
 import { STLExporterService } from './STLExporterService';
+import { ThreeMFExporterService } from './ThreeMFExporterService';
 import { downloadBlob, readFileAsArrayBuffer, readFileAsText } from '../utils/fileHelpers';
 import type { NameplateState, EngineCallbacks, BoundingBoxInfo, PositionOffset, TextBoxConfig } from './types';
 import { DEFAULT_STATE } from './types';
@@ -16,6 +17,7 @@ export class NameplateEngine {
   private logoMeshBuilder = new LogoMeshBuilder();
   private csgProcessor = new CSGProcessor();
   private stlExporter = new STLExporterService();
+  private threeMFExporter = new ThreeMFExporterService();
 
   private state: NameplateState = { ...DEFAULT_STATE };
   private callbacks: EngineCallbacks;
@@ -211,7 +213,7 @@ export class NameplateEngine {
     }
   }
 
-  async generateFinalMesh(): Promise<void> {
+  async generateFinalMesh(format: 'stl' | '3mf' = '3mf'): Promise<void> {
     if (!this.baseGeometry || !this.baseBBox) {
       throw new Error('No base STL loaded.');
     }
@@ -236,11 +238,17 @@ export class NameplateEngine {
       const finalGeometry = await this.csgProcessor.union(this.baseGeometry, embossGeometries);
 
       // Export
-      const blob = this.stlExporter.exportToBlob(finalGeometry);
       const firstName = this.state.textLines[0].trim();
       const lastName = this.state.textLines[1].trim();
       const filename = [firstName, lastName].filter(Boolean).join('_').replace(/\s+/g, '_') || 'nameplate';
-      downloadBlob(blob, `${filename}.stl`);
+
+      if (format === '3mf') {
+        const blob = this.threeMFExporter.exportToBlob(finalGeometry);
+        downloadBlob(blob, `${filename}.3mf`);
+      } else {
+        const blob = this.stlExporter.exportToBlob(finalGeometry);
+        downloadBlob(blob, `${filename}.stl`);
+      }
 
       this.updateState({
         isProcessing: false,

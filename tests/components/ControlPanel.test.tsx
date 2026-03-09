@@ -16,7 +16,8 @@ describe('ControlPanel', () => {
 
     expect(screen.getByText('Nameplate Generator')).toBeInTheDocument();
     expect(screen.getByText('Name Text')).toBeInTheDocument();
-    expect(screen.getByText('Generate & Download STL')).toBeInTheDocument();
+    expect(screen.getByText('Download 3MF')).toBeInTheDocument();
+    expect(screen.getByText('STL')).toBeInTheDocument();
   });
 
   it('disables text inputs when no base STL loaded', () => {
@@ -29,6 +30,7 @@ describe('ControlPanel', () => {
     });
 
     // Export button should be disabled
-    expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled();
+    const buttons = screen.getAllByRole('button');
+    buttons.forEach((btn) => expect(btn).toBeDisabled());
   });
 });

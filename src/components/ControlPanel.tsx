@@ -5,7 +5,7 @@ import { ExportButton } from './ExportButton';
 interface EngineHandle {
   state: NameplateState;
   setTextLine: (index: 0 | 1 | 2, text: string) => void;
-  generateFinalMesh: () => void;
+  generateFinalMesh: (format: 'stl' | '3mf') => void;
 }
 
 interface Props {
