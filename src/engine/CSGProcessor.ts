@@ -6,9 +6,13 @@ import { setWasmUrl, getManifoldModule } from 'manifold-3d/lib/wasm.js';
 let manifoldModule: ManifoldToplevel | null = null;
 
 async function resolveWasmUrl(): Promise<string> {
-  if (typeof process !== 'undefined' && process.versions?.node) {
-    // Node.js (tests): dynamically import 'module' to avoid Vite browser externalization
-    const { createRequire } = await import('module');
+  // Node.js (tests): dynamically import 'module' to avoid Vite browser externalization
+  // Use globalThis check to avoid referencing 'process' which needs @types/node
+  const g = globalThis as Record<string, unknown>;
+  const proc = g['process'] as { versions?: { node?: string } } | undefined;
+  if (proc?.versions?.node) {
+    // @ts-expect-error — 'module' is a Node.js builtin, not available in browser tsconfig types
+    const { createRequire } = await (import(/* @vite-ignore */ 'module') as Promise<{ createRequire: (url: string) => { resolve: (id: string) => string } }>);
     const req = createRequire(import.meta.url);
     const wasmJsPath = req.resolve('manifold-3d/lib/wasm.js');
     return wasmJsPath.replace(/lib\/wasm\.js$/, 'manifold.wasm');

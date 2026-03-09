@@ -15,7 +15,7 @@ export interface ThreeMFPart {
 export class ThreeMFExporterService {
   exportToBlob(parts: ThreeMFPart[], assemblyName?: string): Blob {
     const data = this.exportToUint8Array(parts, assemblyName);
-    return new Blob([data], { type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml' });
+    return new Blob([data as BlobPart], { type: 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml' });
   }
 
   exportToUint8Array(parts: ThreeMFPart[], assemblyName?: string): Uint8Array {
