@@ -4,6 +4,7 @@ import { TextInputSection } from './TextInputSection';
 import { ExportButton } from './ExportButton';
 import { ShareModal } from './ShareModal';
 import { buildShareUrl } from '../utils/shareUrl';
+import { copyToClipboard } from '../utils/clipboard';
 
 interface EngineHandle {
   state: NameplateState;
@@ -19,19 +20,16 @@ export function ControlPanel({ engine }: Props) {
   const { state } = engine;
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+  const [copied, setCopied] = useState(false);
   const [showDownloads, setShowDownloads] = useState(false);
 
   const handleShare = async () => {
     const url = buildShareUrl(state.textLines);
     setShareUrl(url);
+    setCopied(false);
     setShowShareModal(true);
-    // Copy immediately while user activation is still valid —
-    // clipboard API rejects writes outside of direct user gestures
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      // Fallback: modal still shows the URL for manual copy
-    }
+    const ok = await copyToClipboard(url);
+    setCopied(ok);
   };
 
   return (
@@ -91,6 +89,7 @@ export function ControlPanel({ engine }: Props) {
         <ShareModal
           onClose={() => setShowShareModal(false)}
           shareUrl={shareUrl}
+          copied={copied}
         />
       )}
     </div>

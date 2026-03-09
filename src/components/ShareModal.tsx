@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 interface Props {
   onClose: () => void;
   shareUrl: string;
+  copied: boolean;
 }
 
-export function ShareModal({ onClose, shareUrl }: Props) {
+export function ShareModal({ onClose, shareUrl, copied }: Props) {
   const [phase, setPhase] = useState<'generating' | 'ready'>('generating');
 
   useEffect(() => {
@@ -53,9 +54,13 @@ export function ShareModal({ onClose, shareUrl }: Props) {
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
-            <p className="text-gray-800 font-medium mb-1">Link copied to clipboard! 🎉</p>
+            {copied ? (
+              <p className="text-gray-800 font-medium mb-1">Link copied to clipboard! 🎉</p>
+            ) : (
+              <p className="text-gray-800 font-medium mb-1">Your share link is ready! 🎉</p>
+            )}
             <p className="text-sm text-gray-500 mt-1">Send this to whoever has the 3D printer — they'll get your nameplate ready to print! 🖨️</p>
-            <p className="text-xs text-gray-500 break-all bg-gray-50 rounded p-2 mt-3">{shareUrl}</p>
+            <p className="text-xs text-gray-500 break-all bg-gray-50 rounded p-2 mt-3 select-all">{shareUrl}</p>
           </div>
         )}
       </div>
