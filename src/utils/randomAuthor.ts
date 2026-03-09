@@ -32,7 +32,7 @@ export const AUTHORS: [string, string][] = [
   ['Herman', 'MELVILLE'],
   ['Louisa', 'ALCOTT'],
   ['Edgar', 'POE'],
-  ['Charlotte', 'BRONTË'],
+  ['Charlotte', 'PERKINS'],
   ['Pablo', 'NERUDA'],
   ['Chinua', 'ACHEBE'],
   ['Aldous', 'HUXLEY'],
@@ -47,8 +47,8 @@ export const AUTHORS: [string, string][] = [
   ['Zora', 'HURSTON'],
   ['Ursula', 'LE GUIN'],
   ['Chimamanda', 'ADICHIE'],
-  ['Gabriel', 'GARCÍA MÁRQUEZ'],
-  ['Flannery', "O'CONNOR"],
+  ['Robert', 'FROST'],
+  ['Shirley', 'JACKSON'],
 ];
 
 export function getRandomAuthor(): [string, string] {
