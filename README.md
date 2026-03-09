@@ -57,4 +57,10 @@ docker build -t office-nameplates .
 docker run -d -p 8080:80 office-nameplates
 ```
 
+Or pull the pre-built image from GHCR:
+
+```bash
+docker run -d -p 8080:80 ghcr.io/jawbreaker-io/office-nameplates:latest
+```
+
 Open http://localhost:8080 in your browser. The container serves the production build via nginx.
