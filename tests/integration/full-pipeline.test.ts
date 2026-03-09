@@ -58,10 +58,10 @@ describe('Full Pipeline Integration', () => {
     const textGeometries = CSGProcessor.flattenGroup(textGroup);
 
     const processor = new CSGProcessor();
-    const result = await processor.union(baseGeom, textGeometries);
+    const { geometry } = await processor.union(baseGeom, textGeometries);
 
     const exporter = new STLExporterService();
-    const buffer = exporter.exportToArrayBuffer(result);
+    const buffer = exporter.exportToArrayBuffer(geometry);
 
     expect(isValidBinarySTL(buffer)).toBe(true);
 
@@ -89,10 +89,10 @@ describe('Full Pipeline Integration', () => {
 
     const allEmboss = [...textGeometries, ...logoGeometries];
     const processor = new CSGProcessor();
-    const result = await processor.union(baseGeom, allEmboss);
+    const { geometry } = await processor.union(baseGeom, allEmboss);
 
     const exporter = new STLExporterService();
-    const buffer = exporter.exportToArrayBuffer(result);
+    const buffer = exporter.exportToArrayBuffer(geometry);
     expect(isValidBinarySTL(buffer)).toBe(true);
   });
 
@@ -101,10 +101,10 @@ describe('Full Pipeline Integration', () => {
     const baseGeom = importer.loadFromArrayBuffer(loadFixtureSTL());
 
     const processor = new CSGProcessor();
-    const result = await processor.union(baseGeom, []);
+    const { geometry } = await processor.union(baseGeom, []);
 
     const exporter = new STLExporterService();
-    const buffer = exporter.exportToArrayBuffer(result);
+    const buffer = exporter.exportToArrayBuffer(geometry);
     expect(isValidBinarySTL(buffer)).toBe(true);
 
     const view = new DataView(buffer);
@@ -145,10 +145,10 @@ describe('Full Pipeline Integration', () => {
     const textGeometries = CSGProcessor.flattenGroup(textGroup);
 
     const processor = new CSGProcessor();
-    const result = await processor.union(baseGeom, textGeometries);
+    const { geometry } = await processor.union(baseGeom, textGeometries);
 
     const exporter = new STLExporterService();
-    const buffer = exporter.exportToArrayBuffer(result);
+    const buffer = exporter.exportToArrayBuffer(geometry);
     expect(isValidBinarySTL(buffer)).toBe(true);
   });
 });

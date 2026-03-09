@@ -25,6 +25,12 @@ async function getModule(): Promise<ManifoldToplevel> {
   return manifoldModule;
 }
 
+export interface CSGResult {
+  geometry: THREE.BufferGeometry;
+  /** Per-triangle material index: 0 = base, 1 = emboss */
+  triangleMaterials: Uint8Array;
+}
+
 export class CSGProcessor {
   private modulePromise: Promise<ManifoldToplevel>;
 
@@ -74,7 +80,10 @@ export class CSGProcessor {
     return new wasm.Manifold(mesh);
   }
 
-  private fromManifold(manifold: { getMesh(): { numVert: number; numTri: number; triVerts: Uint32Array; position(i: number): Float32Array } }): THREE.BufferGeometry {
+  private fromManifoldWithColors(
+    manifold: { getMesh(): { numVert: number; numTri: number; triVerts: Uint32Array; runIndex: Uint32Array; runOriginalID: Uint32Array; position(i: number): Float32Array } },
+    baseOriginalID: number,
+  ): CSGResult {
     const mesh = manifold.getMesh();
 
     const positions = new Float32Array(mesh.numVert * 3);
@@ -90,12 +99,31 @@ export class CSGProcessor {
     geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(mesh.triVerts), 1));
     geometry.computeVertexNormals();
 
-    return geometry;
+    // Build per-triangle material index from run data
+    const triangleMaterials = new Uint8Array(mesh.numTri);
+    const { runIndex, runOriginalID } = mesh;
+    for (let run = 0; run < runOriginalID.length; run++) {
+      const startTri = runIndex[run] / 3;
+      const endTri = (run + 1 < runIndex.length ? runIndex[run + 1] : mesh.numTri * 3) / 3;
+      const materialIdx = runOriginalID[run] === baseOriginalID ? 0 : 1;
+      for (let t = startTri; t < endTri; t++) {
+        triangleMaterials[t] = materialIdx;
+      }
+    }
+
+    return { geometry, triangleMaterials };
   }
 
-  async union(baseGeometry: THREE.BufferGeometry, embossGeometries: THREE.BufferGeometry[]): Promise<THREE.BufferGeometry> {
+  async union(baseGeometry: THREE.BufferGeometry, embossGeometries: THREE.BufferGeometry[]): Promise<CSGResult> {
     if (embossGeometries.length === 0) {
-      return baseGeometry.clone();
+      const geom = baseGeometry.clone();
+      const triCount = geom.index
+        ? geom.index.count / 3
+        : geom.getAttribute('position').count / 3;
+      return {
+        geometry: geom,
+        triangleMaterials: new Uint8Array(triCount), // all 0 = base
+      };
     }
 
     const wasm = await this.modulePromise;
@@ -108,9 +136,11 @@ export class CSGProcessor {
 
     const preparedBase = this.prepareGeometry(baseGeometry);
 
-    // Convert to Manifold
-    const baseManifold = this.toManifold(wasm, preparedBase);
-    const embossManifold = this.toManifold(wasm, mergedEmboss);
+    // Convert to Manifold — asOriginal() assigns stable IDs for tracking through CSG
+    const baseManifold = this.toManifold(wasm, preparedBase).asOriginal();
+    const embossManifold = this.toManifold(wasm, mergedEmboss).asOriginal();
+
+    const baseOriginalID = baseManifold.originalID();
 
     let result;
     try {
@@ -128,15 +158,15 @@ export class CSGProcessor {
       );
     }
 
-    // Convert back to Three.js geometry
-    const outputGeometry = this.fromManifold(result);
+    // Convert back to Three.js geometry with color tracking
+    const csgResult = this.fromManifoldWithColors(result, baseOriginalID);
 
     // Clean up WASM objects
     baseManifold.delete();
     embossManifold.delete();
     result.delete();
 
-    return outputGeometry;
+    return csgResult;
   }
 
   /**

@@ -58,4 +58,38 @@ describe('ThreeMFExporterService', () => {
     expect(blob.size).toBeGreaterThan(0);
     expect(blob.type).toBe('application/vnd.ms-package.3dmanufacturing-3dmodel+xml');
   });
+
+  it('includes basematerials and per-triangle pid/p1 when materials provided', () => {
+    const exporter = new ThreeMFExporterService();
+    const geom = makeBox();
+    const triCount = geom.index!.count / 3;
+    // First half base (0), second half emboss (1)
+    const materials = new Uint8Array(triCount);
+    for (let i = Math.floor(triCount / 2); i < triCount; i++) {
+      materials[i] = 1;
+    }
+
+    const data = exporter.exportToUint8Array(geom, materials, [
+      { name: 'Base', color: '#A5D1EA' },
+      { name: 'Emboss', color: '#FFFFFF' },
+    ]);
+    const unzipped = unzipSync(data);
+    const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
+
+    expect(modelXml).toContain('<basematerials id="1">');
+    expect(modelXml).toContain('displaycolor="#A5D1EA"');
+    expect(modelXml).toContain('displaycolor="#FFFFFF"');
+    expect(modelXml).toContain('pid="1" p1="0"');
+    expect(modelXml).toContain('pid="1" p1="1"');
+  });
+
+  it('omits basematerials when no materials provided', () => {
+    const exporter = new ThreeMFExporterService();
+    const data = exporter.exportToUint8Array(makeBox());
+    const unzipped = unzipSync(data);
+    const modelXml = strFromU8(unzipped['3D/3dmodel.model']);
+
+    expect(modelXml).not.toContain('<basematerials');
+    expect(modelXml).not.toContain('pid=');
+  });
 });

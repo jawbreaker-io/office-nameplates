@@ -235,7 +235,7 @@ export class NameplateEngine {
       }
 
       // Run CSG union
-      const finalGeometry = await this.csgProcessor.union(this.baseGeometry, embossGeometries);
+      const { geometry: finalGeometry, triangleMaterials } = await this.csgProcessor.union(this.baseGeometry, embossGeometries);
 
       // Export
       const firstName = this.state.textLines[0].trim();
@@ -243,7 +243,10 @@ export class NameplateEngine {
       const filename = [firstName, lastName].filter(Boolean).join('_').replace(/\s+/g, '_') || 'nameplate';
 
       if (format === '3mf') {
-        const blob = this.threeMFExporter.exportToBlob(finalGeometry);
+        const blob = this.threeMFExporter.exportToBlob(finalGeometry, triangleMaterials, [
+          { name: 'Base', color: '#A5D1EA' },
+          { name: 'Emboss', color: '#FFFFFF' },
+        ]);
         downloadBlob(blob, `${filename}.3mf`);
       } else {
         const blob = this.stlExporter.exportToBlob(finalGeometry);

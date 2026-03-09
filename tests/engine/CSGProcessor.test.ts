@@ -16,8 +16,8 @@ describe('CSGProcessor', () => {
     const base = makeBox(10, 10, 10);
     const add = makeBox(5, 5, 5, new THREE.Vector3(5, 5, 5));
 
-    const result = await processor.union(base, [add]);
-    const resultTriCount = result.index!.count / 3;
+    const { geometry } = await processor.union(base, [add]);
+    const resultTriCount = geometry.index!.count / 3;
     // BoxGeometry: 12 triangles (6 faces × 2 tris)
     expect(resultTriCount).toBeGreaterThan(12);
   });
@@ -27,10 +27,34 @@ describe('CSGProcessor', () => {
     const base = makeBox(10, 10, 10);
     const baseVertexCount = base.getAttribute('position').count;
 
-    const result = await processor.union(base, []);
-    const resultVertexCount = result.getAttribute('position').count;
+    const { geometry } = await processor.union(base, []);
+    const resultVertexCount = geometry.getAttribute('position').count;
 
     expect(resultVertexCount).toBe(baseVertexCount);
+  });
+
+  it('union returns per-triangle material indices', async () => {
+    const processor = new CSGProcessor();
+    const base = makeBox(10, 10, 10);
+    const add = makeBox(5, 5, 5, new THREE.Vector3(5, 5, 5));
+
+    const { geometry, triangleMaterials } = await processor.union(base, [add]);
+    const triCount = geometry.index!.count / 3;
+
+    expect(triangleMaterials.length).toBe(triCount);
+    // Should have both material 0 (base) and material 1 (emboss)
+    const hasBase = triangleMaterials.some((m) => m === 0);
+    const hasEmboss = triangleMaterials.some((m) => m === 1);
+    expect(hasBase).toBe(true);
+    expect(hasEmboss).toBe(true);
+  });
+
+  it('union with empty list returns all-zero materials', async () => {
+    const processor = new CSGProcessor();
+    const base = makeBox(10, 10, 10);
+
+    const { triangleMaterials } = await processor.union(base, []);
+    expect(triangleMaterials.every((m) => m === 0)).toBe(true);
   });
 
   it('flattenGroup extracts world-space geometries from nested group', () => {
