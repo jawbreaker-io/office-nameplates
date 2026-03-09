@@ -9,12 +9,7 @@ export function ShareModal({ onClose, shareUrl }: Props) {
   const [phase, setPhase] = useState<'generating' | 'ready'>('generating');
 
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-      } catch {
-        // Clipboard API may not be available in insecure contexts
-      }
+    const timer = setTimeout(() => {
       setPhase('ready');
     }, 1500);
 

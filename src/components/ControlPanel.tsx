@@ -21,10 +21,17 @@ export function ControlPanel({ engine }: Props) {
   const [shareUrl, setShareUrl] = useState('');
   const [showDownloads, setShowDownloads] = useState(false);
 
-  const handleShare = () => {
+  const handleShare = async () => {
     const url = buildShareUrl(state.textLines);
     setShareUrl(url);
     setShowShareModal(true);
+    // Copy immediately while user activation is still valid —
+    // clipboard API rejects writes outside of direct user gestures
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Fallback: modal still shows the URL for manual copy
+    }
   };
 
   return (

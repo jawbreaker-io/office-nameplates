@@ -5,9 +5,6 @@ import { ShareModal } from '../../src/components/ShareModal';
 describe('ShareModal', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    Object.assign(navigator, {
-      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
-    });
   });
 
   afterEach(() => {
@@ -20,7 +17,7 @@ describe('ShareModal', () => {
     expect(screen.getByText('Generating your share link...')).toBeInTheDocument();
   });
 
-  it('transitions to ready state after delay and copies URL', async () => {
+  it('transitions to ready state after delay and shows URL', async () => {
     render(<ShareModal onClose={vi.fn()} shareUrl="https://example.com?fn=Alice" />);
 
     expect(screen.getByTestId('share-generating')).toBeInTheDocument();
@@ -32,7 +29,6 @@ describe('ShareModal', () => {
     expect(screen.getByTestId('share-ready')).toBeInTheDocument();
     expect(screen.getByText('Link copied to clipboard!')).toBeInTheDocument();
     expect(screen.getByText('https://example.com?fn=Alice')).toBeInTheDocument();
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://example.com?fn=Alice');
   });
 
   it('closes on backdrop click', async () => {
@@ -63,29 +59,13 @@ describe('ShareModal', () => {
       <ShareModal onClose={vi.fn()} shareUrl="https://example.com" />
     );
 
-    // Advance to ready state
     await act(async () => {
       vi.advanceTimersByTime(1500);
     });
     expect(screen.getByTestId('share-ready')).toBeInTheDocument();
 
-    // Unmount and remount — simulates parent toggling showShareModal
     unmount();
     render(<ShareModal onClose={vi.fn()} shareUrl="https://example.com" />);
     expect(screen.getByTestId('share-generating')).toBeInTheDocument();
-  });
-
-  it('handles clipboard API failure gracefully', async () => {
-    Object.assign(navigator, {
-      clipboard: { writeText: vi.fn().mockRejectedValue(new Error('Not allowed')) },
-    });
-
-    render(<ShareModal onClose={vi.fn()} shareUrl="https://example.com" />);
-
-    await act(async () => {
-      vi.advanceTimersByTime(1500);
-    });
-
-    expect(screen.getByTestId('share-ready')).toBeInTheDocument();
   });
 });

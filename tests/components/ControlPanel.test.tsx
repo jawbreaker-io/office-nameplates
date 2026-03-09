@@ -67,7 +67,11 @@ describe('ControlPanel', () => {
     expect(shareButton).not.toBeDisabled();
   });
 
-  it('opens share modal when share button is clicked', async () => {
+  it('opens share modal and copies URL to clipboard when share button is clicked', async () => {
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+
     render(<ControlPanel engine={mockEngine} />);
 
     const shareButton = screen.getByText('Share Nameplate').closest('button')!;
@@ -75,6 +79,26 @@ describe('ControlPanel', () => {
       shareButton.click();
     });
 
+    expect(screen.getByText('Generating your share link...')).toBeInTheDocument();
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      expect.stringContaining('fn=James')
+    );
+  });
+
+  it('opens share modal even if clipboard API fails', async () => {
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+    });
+
+    render(<ControlPanel engine={mockEngine} />);
+
+    const shareButton = screen.getByText('Share Nameplate').closest('button')!;
+    await act(async () => {
+      shareButton.click();
+    });
+
+    // Modal still opens despite clipboard failure
     expect(screen.getByText('Generating your share link...')).toBeInTheDocument();
   });
 });
