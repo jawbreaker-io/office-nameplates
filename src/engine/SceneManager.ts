@@ -11,6 +11,7 @@ export class SceneManager {
   readonly directionalLight: THREE.DirectionalLight;
   readonly backLight: THREE.DirectionalLight;
   private animationFrameId: number | null = null;
+  readonly directionalLightOffset: THREE.Vector3;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
@@ -35,6 +36,7 @@ export class SceneManager {
 
     this.directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
     this.directionalLight.position.set(-90, 90, 100);
+    this.directionalLightOffset = new THREE.Vector3(-90, 90, 100);
     this.directionalLight.castShadow = true;
     this.directionalLight.shadow.mapSize.width = 2048;
     this.directionalLight.shadow.mapSize.height = 2048;
@@ -45,6 +47,7 @@ export class SceneManager {
     this.directionalLight.shadow.camera.top = 200;
     this.directionalLight.shadow.camera.bottom = -200;
     this.scene.add(this.directionalLight);
+    this.scene.add(this.directionalLight.target);
 
     this.backLight = new THREE.DirectionalLight(0xffffff, 0.5);
     this.backLight.position.set(-70, 100, -150);
@@ -63,6 +66,14 @@ export class SceneManager {
     const animate = () => {
       this.animationFrameId = requestAnimationFrame(animate);
       this.controls.update();
+
+      // Keep the directional light positioned relative to the camera so
+      // shadows update dynamically as the user orbits the model.
+      const target = this.controls.target;
+      this.directionalLight.position.copy(this.camera.position).add(this.directionalLightOffset);
+      this.directionalLight.target.position.copy(target);
+      this.directionalLight.target.updateMatrixWorld();
+
       this.renderer.render(this.scene, this.camera);
     };
     animate();
