@@ -272,7 +272,7 @@ export class NameplateEngine {
   }
 
   setDirectionalLight(x: number, y: number, z: number, intensity: number): void {
-    this.sceneManager.directionalLightOffset.set(x, y, z);
+    this.sceneManager.directionalLight.position.set(x, y, z);
     this.sceneManager.directionalLight.intensity = intensity;
   }
 

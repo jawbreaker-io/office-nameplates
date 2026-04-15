@@ -11,7 +11,6 @@ export class SceneManager {
   readonly directionalLight: THREE.DirectionalLight;
   readonly backLight: THREE.DirectionalLight;
   private animationFrameId: number | null = null;
-  readonly directionalLightOffset: THREE.Vector3;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
@@ -36,18 +35,19 @@ export class SceneManager {
 
     this.directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
     this.directionalLight.position.set(-90, 90, 100);
-    this.directionalLightOffset = new THREE.Vector3(-90, 90, 100);
     this.directionalLight.castShadow = true;
     this.directionalLight.shadow.mapSize.width = 2048;
     this.directionalLight.shadow.mapSize.height = 2048;
     this.directionalLight.shadow.camera.near = 0.1;
     this.directionalLight.shadow.camera.far = 1000;
+    // Initial shadow frustum; tightened to fit the model in fitShadowToObject().
     this.directionalLight.shadow.camera.left = -200;
     this.directionalLight.shadow.camera.right = 200;
     this.directionalLight.shadow.camera.top = 200;
     this.directionalLight.shadow.camera.bottom = -200;
+    // Slight bias to avoid shadow acne on the embossed text/logo surfaces.
+    this.directionalLight.shadow.bias = -0.0005;
     this.scene.add(this.directionalLight);
-    this.scene.add(this.directionalLight.target);
 
     this.backLight = new THREE.DirectionalLight(0xffffff, 0.5);
     this.backLight.position.set(-70, 100, -150);
@@ -66,14 +66,6 @@ export class SceneManager {
     const animate = () => {
       this.animationFrameId = requestAnimationFrame(animate);
       this.controls.update();
-
-      // Keep the directional light positioned relative to the camera so
-      // shadows update dynamically as the user orbits the model.
-      const target = this.controls.target;
-      this.directionalLight.position.copy(this.camera.position).add(this.directionalLightOffset);
-      this.directionalLight.target.position.copy(target);
-      this.directionalLight.target.updateMatrixWorld();
-
       this.renderer.render(this.scene, this.camera);
     };
     animate();
@@ -106,6 +98,25 @@ export class SceneManager {
     this.camera.position.set(center.x + 72.6, center.y + 30.1, center.z + 148.9);
     this.controls.target.copy(center);
     this.controls.update();
+
+    this.fitShadowToObject(box);
+  }
+
+  /**
+   * Tightens the directional light's shadow camera frustum to fit the model.
+   * The default 400×400 frustum wastes most of the 2048×2048 shadow map on
+   * empty space, producing grainy shadows. Sizing the frustum to the model
+   * (with a small margin) maximizes texels-per-world-unit.
+   */
+  private fitShadowToObject(box: THREE.Box3): void {
+    const size = box.getSize(new THREE.Vector3());
+    const half = Math.max(size.x, size.y, size.z) * 0.6;
+    const cam = this.directionalLight.shadow.camera;
+    cam.left = -half;
+    cam.right = half;
+    cam.top = half;
+    cam.bottom = -half;
+    cam.updateProjectionMatrix();
   }
 
   resetView(): void {
