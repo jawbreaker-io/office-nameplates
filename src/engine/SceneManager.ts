@@ -30,7 +30,10 @@ export class SceneManager {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // PCF (not Soft) gives sharper shadows for the small embossed text/logo
+    // details. Soft PCF blurs over too many texels at this resolution, which
+    // produces a noisy speckled pattern on fine features.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     // Lights
     this.ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
@@ -39,8 +42,8 @@ export class SceneManager {
     this.directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
     this.directionalLight.position.set(-90, 90, 100);
     this.directionalLight.castShadow = true;
-    this.directionalLight.shadow.mapSize.width = 2048;
-    this.directionalLight.shadow.mapSize.height = 2048;
+    this.directionalLight.shadow.mapSize.width = 4096;
+    this.directionalLight.shadow.mapSize.height = 4096;
     this.directionalLight.shadow.camera.near = 0.1;
     this.directionalLight.shadow.camera.far = 1000;
     // Initial shadow frustum; tightened to fit the model in fitShadowToObject().
