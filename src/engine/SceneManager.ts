@@ -51,8 +51,10 @@ export class SceneManager {
     this.directionalLight.shadow.camera.right = 200;
     this.directionalLight.shadow.camera.top = 200;
     this.directionalLight.shadow.camera.bottom = -200;
-    // Slight bias to avoid shadow acne on the embossed text/logo surfaces.
-    this.directionalLight.shadow.bias = -0.0005;
+    // Use normalBias (offset along surface normal) instead of a large bias
+    // to keep shadows attached to thin emboss features without peter-panning.
+    this.directionalLight.shadow.bias = -0.00005;
+    this.directionalLight.shadow.normalBias = 0.02;
     this.scene.add(this.directionalLight);
     this.scene.add(this.directionalLight.target);
 
